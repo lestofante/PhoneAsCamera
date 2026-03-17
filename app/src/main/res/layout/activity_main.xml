@@ -1,0 +1,48 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <com.pedro.library.view.OpenGlView
+            android:id="@+id/openGlView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="invisible" />
+
+        <TextView
+            android:id="@+id/previewLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="Preview disabled"
+            android:textSize="12sp"
+            android:textColor="#888888"
+            android:translationZ="-1dp"/> <!-- behind the opengl, visible only when that is invisible -->
+
+
+    </FrameLayout>
+
+    <Spinner
+        android:id="@+id/cameraSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="100dp" />
+
+    <Button
+        android:id="@+id/button"
+        android:layout_width="wrap_content"
+        android:layout_height="100dp"
+        android:layout_gravity="center_horizontal"
+        android:text="START STREAM" />
+
+    <CheckBox
+        android:id="@+id/checkBox_preview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Enable preview" />
+
+</LinearLayout>
