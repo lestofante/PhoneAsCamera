@@ -190,18 +190,31 @@ class MainActivity : AppCompatActivity() {
 //            val formatName = when (format) {
 //                ImageFormat.YUV_420_888 -> "YUV"
 //                ImageFormat.JPEG        -> "JPEG"
-//                ImageFormat.PRIVATE     -> "PRIVATE"
+//                ImageFormat.PRIVATE     -> continue // skip unknown/unusable
 //                ImageFormat.RAW_SENSOR  -> "RAW"
 //                else                    -> continue  // skip unknown/unusable
 //            }
 //            val sizes = map.getOutputSizes(format) ?: continue
+//            val fpsRanges = chars.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES) ?: emptyArray()
+//
+//            // extract distinct max FPS values
+//            val supportedFps = fpsRanges
+//                .map { it.upper }
+//                .distinct()
+//                .sorted()
+//
 //            for (size in sizes) {
-//                cameraModes.add(CameraMode(
-//                    format = format,
-//                    width = size.width,
-//                    height = size.height,
-//                    label = "$formatName — ${size.width}×${size.height}"
-//                ))
+//                for (fps in supportedFps) {
+//                    cameraModes.add(
+//                        StreamingService.CameraMode(
+//                            cameraId = cameraId,
+//                            fps = fps,
+//                            width = size.width,
+//                            height = size.height,
+//                            label = "$formatName — ${size.width}×${size.height}"
+//                        )
+//                    )
+//                }
 //            }
 //        }
 //
@@ -218,14 +231,16 @@ class MainActivity : AppCompatActivity() {
 //                pos: Int,
 //                id: Long
 //            ) {
-//                Log.d("SPINNER", "selected mode " + cameraModes[cameraSpinner.selectedItemPosition])
+//                Log.d("SPINNER", "selected mode " + cameraModes[modeSpinner.selectedItemPosition])
+//                StreamingService.mode = cameraModes[modeSpinner.selectedItemPosition]
 //                if (StreamingService.instance != null)
-//                    StreamingService.instance?.switchCameraMode(cameraModes[cameraSpinner.selectedItemPosition])
+//                    StreamingService.instance?.updateCameraMode()
 //            }
 //
 //            override fun onNothingSelected(parent: AdapterView<*>) {}
 //        }
 //    }
+
     private fun loadCameraModes(cameraId: String) {
         val manager = getSystemService(CAMERA_SERVICE) as CameraManager
         val chars = manager.getCameraCharacteristics(cameraId)
