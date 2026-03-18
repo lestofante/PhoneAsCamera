@@ -32,6 +32,11 @@
         android:layout_width="match_parent"
         android:layout_height="100dp" />
 
+    <Spinner
+        android:id="@+id/modeSpinner"
+        android:layout_width="match_parent"
+        android:layout_height="100dp" />
+
     <Button
         android:id="@+id/button"
         android:layout_width="wrap_content"
@@ -44,5 +49,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Enable preview" />
+
+    <CheckBox
+        android:id="@+id/checkBox_lantern"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Enable lantern" />
 
 </LinearLayout>

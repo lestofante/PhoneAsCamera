@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.ImageFormat
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -30,6 +31,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var button: Button
     private var running = false
     private lateinit var cameraSpinner: Spinner
+    private lateinit var modeSpinner: Spinner
     private val cameraIds = mutableListOf<String>()
     private var glView: OpenGlView? = null
 
@@ -55,7 +57,9 @@ class MainActivity : AppCompatActivity() {
         requestPermission()
 
         cameraSpinner = findViewById(R.id.cameraSpinner)
+        modeSpinner = findViewById(R.id.modeSpinner)
         loadCameras()
+
         Log.i("phoneascamera", "phoneascamera")
         //udpCamera2 = UdpCamera2(glView, connectChecker)
 
@@ -110,6 +114,12 @@ class MainActivity : AppCompatActivity() {
                 glView?.visibility = View.INVISIBLE  // hiding it effectively clears it visually
             }
         }
+
+        val checkboxLantern: CheckBox = findViewById(R.id.checkBox_lantern)
+        checkboxLantern.setOnCheckedChangeListener { _, isChecked ->
+            StreamingService.useLantern = isChecked
+            StreamingService.instance?.setLantern()
+        }
     }
 
     private fun requestPermission() {
@@ -155,8 +165,119 @@ class MainActivity : AppCompatActivity() {
                 id: Long
             ) {
                 Log.d("SPINNER", "selected cam " + cameraIds[pos])
+                loadCameraModes(cameraIds[pos])
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>) {}
+        }
+
+        if (cameraIds.isNotEmpty()) {
+            loadCameraModes(cameraIds[0])
+        }
+
+    }
+
+    private val cameraModes = mutableListOf<StreamingService.CameraMode>()
+
+//    private fun loadCameraModes(cameraId: String) {
+//        val manager = getSystemService(CAMERA_SERVICE) as CameraManager
+//        val chars = manager.getCameraCharacteristics(cameraId)
+//        val map = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: return
+//
+//        cameraModes.clear()
+//
+//        for (format in map.outputFormats) {
+//            val formatName = when (format) {
+//                ImageFormat.YUV_420_888 -> "YUV"
+//                ImageFormat.JPEG        -> "JPEG"
+//                ImageFormat.PRIVATE     -> "PRIVATE"
+//                ImageFormat.RAW_SENSOR  -> "RAW"
+//                else                    -> continue  // skip unknown/unusable
+//            }
+//            val sizes = map.getOutputSizes(format) ?: continue
+//            for (size in sizes) {
+//                cameraModes.add(CameraMode(
+//                    format = format,
+//                    width = size.width,
+//                    height = size.height,
+//                    label = "$formatName — ${size.width}×${size.height}"
+//                ))
+//            }
+//        }
+//
+//        val adapter = ArrayAdapter(this,
+//            android.R.layout.simple_spinner_item,
+//            cameraModes.map { it.label })
+//        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+//        modeSpinner.adapter = adapter
+//
+//        modeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+//            override fun onItemSelected(
+//                parent: AdapterView<*>,
+//                view: android.view.View?,
+//                pos: Int,
+//                id: Long
+//            ) {
+//                Log.d("SPINNER", "selected mode " + cameraModes[cameraSpinner.selectedItemPosition])
+//                if (StreamingService.instance != null)
+//                    StreamingService.instance?.switchCameraMode(cameraModes[cameraSpinner.selectedItemPosition])
+//            }
+//
+//            override fun onNothingSelected(parent: AdapterView<*>) {}
+//        }
+//    }
+    private fun loadCameraModes(cameraId: String) {
+        val manager = getSystemService(CAMERA_SERVICE) as CameraManager
+        val chars = manager.getCameraCharacteristics(cameraId)
+        val map = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: return
+
+        // get supported FPS ranges
+        val fpsRanges = chars.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES) ?: emptyArray()
+
+        // extract distinct max FPS values
+        val supportedFps = fpsRanges
+            .map { it.upper }
+            .distinct()
+            .sorted()
+
+        cameraModes.clear()
+
+        val sizes = map.getOutputSizes(ImageFormat.YUV_420_888) ?: return
+        for (size in sizes) {
+            for (fps in supportedFps) {
+                cameraModes.add(
+                    StreamingService.CameraMode(
+                        cameraId = cameraId,
+                        width = size.width,
+                        height = size.height,
+                        fps = fps,
+                        label = "${size.width}x${size.height} @ $fps fps"
+                    )
+                )
+            }
+        }
+
+        val adapter = ArrayAdapter(this,
+            android.R.layout.simple_spinner_item,
+            cameraModes.map { it.label })
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        modeSpinner.adapter = adapter
+
+        StreamingService.mode = cameraModes[modeSpinner.selectedItemPosition]
+        if (StreamingService.instance != null)
+            StreamingService.instance?.updateCameraMode()
+
+        modeSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>,
+                view: android.view.View?,
+                pos: Int,
+                id: Long
+            ) {
+                Log.d("SPINNER", "selected mode " + cameraModes[modeSpinner.selectedItemPosition])
+                StreamingService.mode = cameraModes[modeSpinner.selectedItemPosition]
                 if (StreamingService.instance != null)
-                    StreamingService.instance?.switchCamera(cameraIds[pos])
+                    StreamingService.instance?.updateCameraMode()
             }
 
             override fun onNothingSelected(parent: AdapterView<*>) {}
