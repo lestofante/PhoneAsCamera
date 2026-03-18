@@ -28,6 +28,26 @@ class MainActivity : AppCompatActivity() {
 
     //too slow but works: ffmpeg -fflags nobuffer -flags low_delay -analyzeduration 100000 -probesize 100000 -i "udp://0.0.0.0:5000?overrun_nonfatal=1" -vf format=yuyv422 -c:v rawvideo -f v4l2 /dev/video10
 
+    // IT WORK WITH:
+    // 1: create video device: sudo modprobe v4l2loopback devices=1 video_nr=20 card_label="PipeWireCam" exclusive_caps=1
+    // 2: receive, transcode 420p to 422 by HW, pass to video (this does not handle change of format nicely, ffplay does):
+    // ffmpeg \                                                                                                                                                                                                                                                                        255 ✘  took 14s    at 02:26:37 
+    //  -fflags nobuffer+discardcorrupt \
+    //  -flags low_delay \
+    //  -probesize 1000 \
+    //  -analyzeduration 1000 \
+    //  -init_hw_device vaapi=va:/dev/dri/renderD128 \
+    //  -filter_hw_device va \
+    //  -hwaccel vaapi \
+    //  -hwaccel_output_format vaapi \
+    //  -f mpegts -i "udp://0.0.0.0:5000?fifo_size=5000000&overrun_nonfatal=1" \
+    //  -map 0:v \
+    //  -vf "hwdownload,format=nv12" \
+    //  -fps_mode passthrough \
+    //  -f v4l2 -pix_fmt nv12 /dev/video20
+    //
+    // 3: run any webcam software, it should just work. Tested with Kamoso and firefox
+
     private lateinit var button: Button
     private var running = false
     private lateinit var cameraSpinner: Spinner
