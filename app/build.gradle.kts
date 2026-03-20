@@ -44,7 +44,7 @@ android {
 }
 
 dependencies {
-    implementation("com.github.pedroSG94.RootEncoder:library:166a330d9b")
+    implementation("com.github.pedroSG94.RootEncoder:library:496c7f2844")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

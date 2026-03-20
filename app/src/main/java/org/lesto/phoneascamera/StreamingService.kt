@@ -14,6 +14,7 @@ import androidx.core.app.NotificationCompat
 import com.pedro.common.ConnectChecker
 import com.pedro.library.udp.UdpCamera2
 import com.pedro.library.view.OpenGlView
+import java.util.concurrent.atomic.AtomicBoolean
 
 class StreamingService : Service() {
     data class CameraMode(
@@ -31,63 +32,98 @@ class StreamingService : Service() {
         var onStarted: (() -> Unit)? = null
         val serverIp = "192.168.178.25"  // replace with receiver IP
         val port = 5000
-        var mode :CameraMode = CameraMode("0", 1280, 720, 30, "DEFAULT")
+        @Volatile var mode :CameraMode = CameraMode("0", 1280, 720, 30, "DEFAULT")
         var useLantern = false
     }
 
     private lateinit var udpCamera2: UdpCamera2
     private var wakeLock: PowerManager.WakeLock? = null
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private var reloading = false
+    private var reconnecting = AtomicBoolean(false)
+    private var retry = 0
+    @Volatile private var reloading = false
+
+
 
 //    fun switchCamera(new_mode :CameraMode) {
 //        mode = new_mode
 //    }
 
+    fun startStreaming(){
+        if (retry > 1200)//if failing many times, ~10 min
+        {
+            stopSelf()
+        }
+        udpCamera2.stopStream()
+        Thread.sleep(300)
+        udpCamera2.switchCamera(mode.cameraId)
+        udpCamera2.prepareVideo(mode.width, mode.height, mode.fps, 40_000_000, 1, 0, MediaCodecInfo.CodecProfileLevel.AVCProfileHigh, MediaCodecInfo.CodecProfileLevel.AVCLevel41)
+        udpCamera2.prepareAudio() // optional
+        // Start streaming
+        udpCamera2.startStream("udp://$serverIp:$port")
+        if (!udpCamera2.enableOpticalVideoStabilization()) {
+            udpCamera2.enableVideoStabilization()
+        }
+
+        setLantern()
+        reconnecting.set(false)
+    }
+
     fun setPreview(view: OpenGlView?) {
         //TODO: BROKEN
-        if (view != null) {
-            udpCamera2.replaceView(view)
-        } else {
-            udpCamera2.replaceView(this) // back to internal windowmanager view
+        if (udpCamera2.isStreaming) {
+            if (view != null) {
+                udpCamera2.replaceView(view)
+            } else {
+                udpCamera2.replaceView(this) // back to internal windowmanager view
+            }
         }
     }
 
     private val connectChecker = object : ConnectChecker {
         override fun onConnectionStarted(url: String) {}
         override fun onConnectionSuccess() {
+            retry = 0 // reset retry counter
             Log.d("UDP", "Connected")
             onStarted?.invoke()
         }
         override fun onConnectionFailed(reason: String) {
-            Log.e("UDP", "Failed: $reason")
-//            runOnUiThread {
-//                udpCamera2.stopStream()
-//                running = false
-//                button.text = "START STREAM"
-//            }
-            stopSelf()
+            retry++
+            Log.e("UDP", "Failed: $reason n. $retry")
+            if (!reconnecting.getAndSet(true)) {
+                Thread {
+                    Thread.sleep(500)
+                    startStreaming()
+                }.start()
+            }
         }
         override fun onNewBitrate(bitrate: Long) {
             Log.d("UDP", "someone requested bitrate: $bitrate")
         }
-        override fun onDisconnect() {
-            if (reloading){
-                reloading = false
-                Log.d("UDP", "Disconnected for reloading")
-                mainHandler.post {
-                    udpCamera2.switchCamera(mode.cameraId)
-                    udpCamera2.prepareVideo(mode.width, mode.height, 30, 40_000_000, 1, 0)
-                    udpCamera2.prepareAudio()
-                    udpCamera2.startStream("udp://$serverIp:$port")
-                    if (!udpCamera2.enableOpticalVideoStabilization()) {
-                        udpCamera2.enableVideoStabilization()
-                    }
 
-                    setLantern()
+        override fun onDisconnect() {
+            if (instance == null){
+                Log.d("UDP", "Disconnected for closing")
+                // if instance is NULL, we are closing up
+                return
+            }
+            if (reloading) {
+                Log.d("UDP", "Disconnected for reloading")
+                reloading = false
+                if (!reconnecting.getAndSet(true)) {
+                    Thread {
+                        startStreaming()
+                    }.start()
+                }
+            }else{
+                retry++
+                Log.d("UDP", "Disconnected")
+                if (!reconnecting.getAndSet(true)) {
+                    Thread {
+                        Thread.sleep(500)
+                        startStreaming()
+                    }.start()
                 }
             }
-
         }
         override fun onAuthError() {}
         override fun onAuthSuccess() {}
@@ -134,24 +170,7 @@ class StreamingService : Service() {
 
         // Initialize UdpCamera2
         udpCamera2 = UdpCamera2(this, connectChecker)
-
-        udpCamera2.switchCamera(mode.cameraId)
-
-        //udpCamera2.setVideoEncoderCallback { /* optional callback */ }
-
-        // Prepare video: width=1280, height=720, fps=30, bitrate=10Mbps, rotation=0, camera=1
-
-        udpCamera2.prepareVideo(mode.width, mode.height, mode.fps, 40_000_000, 1, 0, MediaCodecInfo.CodecProfileLevel.AVCProfileHigh, MediaCodecInfo.CodecProfileLevel.AVCLevel41)
-        udpCamera2.prepareAudio() // optional
-
-        // Start streaming
-        udpCamera2.startStream("udp://$serverIp:$port")
-
-        if (!udpCamera2.enableOpticalVideoStabilization()) {
-            udpCamera2.enableVideoStabilization()
-        }
-
-        setLantern()
+        startStreaming()
 
         instance = this
     }
