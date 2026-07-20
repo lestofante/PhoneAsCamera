@@ -90,10 +90,7 @@ class StreamingService : Service() {
             retry++
             Log.e("UDP", "Failed: $reason n. $retry")
             if (!reconnecting.getAndSet(true)) {
-                Thread {
-                    Thread.sleep(500)
-                    startStreaming()
-                }.start()
+                udpCamera2.streamClient.reTry(1000, reason, null)
             }
         }
         override fun onNewBitrate(bitrate: Long) {
@@ -170,6 +167,8 @@ class StreamingService : Service() {
 
         // Initialize UdpCamera2
         udpCamera2 = UdpCamera2(this, connectChecker)
+        udpCamera2.streamClient.setReTries(100)
+
         startStreaming()
 
         instance = this
